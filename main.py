@@ -4,9 +4,10 @@
 import os, time, pickle, random, time
 from datetime import datetime
 import numpy as np
+
 from time import localtime, strftime
 import logging, scipy
-
+import random
 import tensorflow as tf
 import tensorlayer as tl
 from model import *
@@ -48,6 +49,7 @@ def read_all_imgs_and_crop(img_list, path='', n_threads=32):
         imgs.extend(b_imgs)
         print('read %d from %s' % (len(imgs), path))
     return imgs
+
 def train():
     ## create folders to save result images and trained model
     save_dir_ginit = "samples/{}_ginit".format(tl.global_flag['mode'])
@@ -188,14 +190,18 @@ def train():
         #     b_imgs_96 = tl.prepro.threading_data(b_imgs_384, fn=downsample_fn)
 
         ## If your machine have enough memory, please pre-load the whole train set.
+        random_idx = range(0, len(train_hr_imgs))
+        random.shuffle(random_idx)
         for idx in range(0, len(train_hr_imgs), batch_size):
             step_time = time.time()
+
             b_imgs_hr = tl.prepro.threading_data(
-                    train_hr_imgs[idx : idx + batch_size],
-                    fn=crop_sub_imgs_fn, is_random=True)
+                   train_hr_imgs,
+                   fn=get_batch_randomly, random_idx=random_idx, start_idx=idx, batch_size=batch_size)
             b_imgs_lr = tl.prepro.threading_data(
-                train_lr_imgs[idx: idx + batch_size],
-                fn=crop_sub_imgs_fn, is_random=True)
+                    train_lr_imgs,
+                    fn=get_batch_randomly, random_idx=random_idx, start_idx=idx, batch_size=batch_size)
+
             ## update G
             errM, _ = sess.run([mse_loss, g_optim_init], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
             print("Epoch [%2d/%2d] %4d time: %4.4fs, mse: %.8f " % (epoch, n_epoch_init, n_iter, time.time() - step_time, errM))
@@ -241,14 +247,23 @@ def train():
         #     b_imgs_96 = tl.prepro.threading_data(b_imgs_384, fn=downsample_fn)
 
         ## If your machine have enough memory, please pre-load the whole train set.
+        random_idx = range(0, len(train_hr_imgs))
+        random.shuffle(random_idx)
         for idx in range(0, len(train_hr_imgs), batch_size):
             step_time = time.time()
+
+            b_imgs_hr = list()
+            b_imgs_lr = list()
+            for i in range(batch_size):
+                b_imgs_hr.append(train_hr_imgs[random_idx[idx + i]])
+                b_imgs_lr.append(train_lr_imgs[random_idx[idx + i]])
+
             b_imgs_hr = tl.prepro.threading_data(
-                    train_hr_imgs[idx : idx + batch_size],
-                    fn=crop_sub_imgs_fn, is_random=True)
+                train_hr_imgs,
+                fn=get_batch_randomly, random_idx=random_idx, start_idx=idx, batch_size=batch_size)
             b_imgs_lr = tl.prepro.threading_data(
-                    train_hr_imgs[idx : idx + batch_size],
-                    fn=crop_sub_imgs_fn, is_random=True)
+                train_lr_imgs,
+                fn=get_batch_randomly, random_idx=random_idx, start_idx=idx, batch_size=batch_size)
             ## update D
             errD, _ = sess.run([d_loss, d_optim], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
             ## update G

@@ -33,3 +33,10 @@ def downsample_fn(x):
     x = x / (255. / 2.)
     x = x - 1.
     return x
+
+def get_batch_randomly(x, random_idx, start_idx, batch_size):
+    batch = list()
+    for i in range(batch_size):
+        batch.append(x[random_idx[start_idx + i]])
+
+    return batch
