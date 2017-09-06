@@ -44,7 +44,7 @@ def read_all_imgs_and_crop(img_list, path='', n_threads=32):
     imgs = []
     for idx in range(0, len(img_list), n_threads):
         b_imgs_list = img_list[idx: idx + n_threads]
-        b_imgs = tl.prepro.threading_data(b_imgs_list, fn=generate_sub_imgs_fn, path=path)
+        b_imgs = tl.prepro.threading_data(b_imgs_list, fn=get_sub_imgs_fn, path=path)
         # print(b_imgs.shape)
         imgs.extend(b_imgs)
         print('read %d from %s' % (len(imgs), path))

@@ -13,13 +13,15 @@ def get_imgs_fn(file_name, path):
     # return scipy.misc.imread(path + file_name).astype(np.float)
     return scipy.misc.imread(path + file_name, mode='RGB')
 
-def generate_sub_imgs_fn(x, sub_img_w, sub_img_h, row_index=0, col_index=1):
+def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, row_index=0, col_index=1):
+    x = scipy.misc.imread(path + file_name, mode='F')
     h, w = x.shape[row_index], x.shape[col_index]
     results = list()
     for l_w in range(0, w, sub_img_w):
         for l_h in range(0, h, sub_img_h):
             results.append(x[l_w:l_w + sub_img_w, l_h:l_h + sub_img_h])
-    return results
+
+    return np.asarray(results)
 
 def crop_sub_imgs_fn(x, is_random=True):
     x = crop(x, wrg=384, hrg=384, is_random=is_random)
