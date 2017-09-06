@@ -159,17 +159,17 @@ def train():
 
     ###============================= TRAINING ===============================###
     ## use first `batch_size` of train set to have a quick test during training
-    sample_hr_imgs = train_hr_imgs[0:batch_size]
-    sample_lr_imgs = train_lr_imgs[0:batch_size]
+    sample_hr_img_list = train_hr_img_list[0:batch_size]
+    sample_lr_img_list = train_hr_img_list[0:batch_size]
     # sample_imgs = read_all_imgs(train_hr_img_list[0:batch_size], path=config.TRAIN.hr_img_path, n_threads=32) # if no pre-load train set
-    #sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_imgs, fn=crop_sub_imgs_fn, is_random=False)
-    #print('sample HR sub-image:',sample_hr_imgs.shape, sample_hr_imgs.min(), sample_hr_imgs.max())
-    #sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_imgs, fn=crop_sub_imgs_fn, is_random=False)
-    #print('sample LR sub-image:', sample_sub_lr_imgs.shape, sample_sub_lr_imgs.min(), sample_sub_lr_imgs.max())
-    tl.vis.save_images(sample_hr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_label.png')
-    tl.vis.save_images(sample_lr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_input.png')
-    tl.vis.save_images(sample_hr_imgs, [ni, ni], save_dir_gan+'/_train_sample_label.png')
-    tl.vis.save_images(sample_lr_imgs, [ni, ni], save_dir_gan+'/_train_sample_input.png')
+    sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_img_list, fn=generate_sub_imgs_fn, path=config.TRAIN.hr_img_path)
+    print('sample HR sub-image:', sample_hr_imgs.min(), sample_hr_imgs.max())
+    sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_img_list, fn=generate_sub_imgs_fn, path=config.TRAIN.lr_img_path)
+    print('sample LR sub-image:', sample_sub_lr_imgs.min(), sample_sub_lr_imgs.max())
+    tl.vis.save_images(sample_sub_hr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_label.png')
+    tl.vis.save_images(sample_sub_lr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_input.png')
+    tl.vis.save_images(sample_sub_hr_imgs, [ni, ni], save_dir_gan+'/_train_sample_label.png')
+    tl.vis.save_images(sample_sub_lr_imgs, [ni, ni], save_dir_gan+'/_train_sample_input.png')
 
     ###========================= initialize G ====================###
     ## fixed learning rate
