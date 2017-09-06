@@ -101,7 +101,7 @@ def SRGAN_g2(t_image, is_train=False, reuse=False):
         n = BatchNormLayer(n, act=tf.nn.relu,
                 is_train=is_train, gamma_init=g_init, name='up2/batch_norm')
 
-        n = Conv2d(n, 3, (1, 1), (1, 1), act=tf.nn.tanh, padding='SAME', W_init=w_init, name='out')
+        n = Conv2d(n, 1, (1, 1), (1, 1), act=tf.nn.tanh, padding='SAME', W_init=w_init, name='out')
         return n
 
 
