@@ -44,7 +44,8 @@ def read_all_imgs_and_crop(img_list, path='', n_threads=32):
     imgs = []
     for idx in range(0, len(img_list), n_threads):
         b_imgs_list = img_list[idx: idx + n_threads]
-        b_imgs = tl.prepro.threading_data(b_imgs_list, fn=get_sub_imgs_fn, path=path)
+        b_imgs = tl.prepro.threading_data(b_imgs_list, fn=get_sub_imgs_fn, path=path, sub_img_w=config.TRAIN.img_W,
+                                          sub_img_h=config.TRAIN.img_H)
         # print(b_imgs.shape)
         imgs.extend(b_imgs)
         print('read %d from %s' % (len(imgs), path))
@@ -162,9 +163,16 @@ def train():
     sample_hr_img_list = train_hr_img_list[0:batch_size]
     sample_lr_img_list = train_hr_img_list[0:batch_size]
     # sample_imgs = read_all_imgs(train_hr_img_list[0:batch_size], path=config.TRAIN.hr_img_path, n_threads=32) # if no pre-load train set
-    sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_img_list, fn=generate_sub_imgs_fn, path=config.TRAIN.hr_img_path)
+    sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_img_list, fn=generate_sub_imgs_fn,
+                                                  path=config.TRAIN.hr_img_path,
+                                                  sub_img_w=config.TRAIN.img_W,
+                                                  sub_img_h=config.TRAIN.img_H)
     print('sample HR sub-image:', sample_hr_imgs.min(), sample_hr_imgs.max())
-    sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_img_list, fn=generate_sub_imgs_fn, path=config.TRAIN.lr_img_path)
+    sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_img_list, fn=generate_sub_imgs_fn,
+                                                  path=config.TRAIN.lr_img_path,
+                                                  sub_img_w=config.TRAIN.img_W,
+                                                  sub_img_h=config.TRAIN.img_H
+                                                  )
     print('sample LR sub-image:', sample_sub_lr_imgs.min(), sample_sub_lr_imgs.max())
     tl.vis.save_images(sample_sub_hr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_label.png')
     tl.vis.save_images(sample_sub_lr_imgs, [ni, ni], save_dir_ginit+'/_train_sample_input.png')
