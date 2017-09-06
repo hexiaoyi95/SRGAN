@@ -163,12 +163,12 @@ def train():
     sample_hr_img_list = train_hr_img_list[0:batch_size]
     sample_lr_img_list = train_hr_img_list[0:batch_size]
     # sample_imgs = read_all_imgs(train_hr_img_list[0:batch_size], path=config.TRAIN.hr_img_path, n_threads=32) # if no pre-load train set
-    sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_img_list, fn=generate_sub_imgs_fn,
+    sample_sub_hr_imgs = tl.prepro.threading_data(sample_hr_img_list, fn=get_sub_imgs_fn,
                                                   path=config.TRAIN.hr_img_path,
                                                   sub_img_w=config.TRAIN.img_W,
                                                   sub_img_h=config.TRAIN.img_H)
     print('sample HR sub-image:', sample_hr_imgs.min(), sample_hr_imgs.max())
-    sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_img_list, fn=generate_sub_imgs_fn,
+    sample_sub_lr_imgs = tl.prepro.threading_data(sample_lr_img_list, fn=get_sub_imgs_fn,
                                                   path=config.TRAIN.lr_img_path,
                                                   sub_img_w=config.TRAIN.img_W,
                                                   sub_img_h=config.TRAIN.img_H
