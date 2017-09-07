@@ -23,11 +23,13 @@ config.TRAIN.lr_decay = 0.1
 config.TRAIN.decay_every = int(config.TRAIN.n_epoch / 2)
 
 ## train set location
-config.TRAIN.hr_img_path = expanduser('~/disk3/data/imgs/label/')
-config.TRAIN.lr_img_path = expanduser('~/disk3/data/imgs/input/')
+config.TRAIN.hr_img_path = expanduser('~/disk3/data/test_imgs/label/')
+config.TRAIN.lr_img_path = expanduser('~/disk3/data/test_imgs/train/')
 config.TRAIN.img_H = 128
 config.TRAIN.img_W = 128
 config.TRAIN.img_C = 1
+
+config.TRAIN.summaries_dir = '/tmp/srgan_train/'
 
 config.VALID = edict()
 ## test set location
