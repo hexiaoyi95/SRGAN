@@ -38,13 +38,16 @@ def save_images(images, size, image_path):
     >>> images = np.random.rand(64, 100, 100, 3)
     >>> tl.visualize.save_images(images, [8, 8], 'temp.png')
     """
+
     def merge(images, size):
-        h, w = images.shape[1], images.shape[2]
-        img = np.zeros((h * size[0], w * size[1], 1))
+        h, w ,c= images.shape[1], images.shape[2], images.shape[3]
+        img = np.zeros((h * size[0], w * size[1], c))
         for idx, image in enumerate(images):
             i = idx % size[1]
             j = idx // size[1]
-            img[j*h:j*h+h, i*w:i*w+w, :] = image.reshape(h,w,1)
+            img[j*h:j*h+h, i*w:i*w+w, :] = image
+        if img.shape[2] == 1:
+            img = img.reshape(img.shape[0],img.shape[1])
         return img
 
     def imsave(images, size, path):

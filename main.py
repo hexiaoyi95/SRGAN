@@ -179,10 +179,11 @@ def train():
     #                                              sub_img_h=config.TRAIN.img_H
     #                                              )
     #print('sample LR sub-image:', sample_sub_lr_imgs.min(), sample_sub_lr_imgs.max())
-    #tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_label.png')
-    #tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_input.png')
-    #tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_gan+'/_train_sample_label.png')
-    #tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_gan+'/_train_sample_input.png')
+    print np.asarray(sample_hr_imgs).shape
+    tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_label.png')
+    tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_input.png')
+    tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_gan+'/_train_sample_label.png')
+    tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_gan+'/_train_sample_input.png')
 
     ###========================= initialize G ====================###
     ## fixed learning rate
@@ -203,9 +204,10 @@ def train():
         #     b_imgs_96 = tl.prepro.threading_data(b_imgs_384, fn=downsample_fn)
 
         ## If your machine have enough memory, please pre-load the whole train set.
-        random_idx = list(range(0, len(train_hr_imgs)))
+        fix_length = len(train_hr_imgs) - len(train_hr_imgs) % batch_size
+        random_idx = list(range(0, fix_length))
         random.shuffle(random_idx)
-        for idx in range(0, len(train_hr_imgs), batch_size):
+        for idx in range(0, fix_length, batch_size):
             step_time = time.time()
             b_imgs_hr = list()
             b_imgs_lr = list()
@@ -230,13 +232,13 @@ def train():
         print(log)
 
         ## quick evaluation on train set
-        if (epoch != 0) and (epoch % 10 == 0):
+        if (epoch != 0) and (epoch % 1 == 0):
             out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
             print("[*] save images")
-            #tl.vis.save_images(out, [ni, ni], save_dir_ginit+'/train_%d.png' % epoch)
+            tl.vis.save_images(out, [ni, ni], save_dir_ginit+'/train_%d.png' % epoch)
 
         ## save model
-        if (epoch != 0) and (epoch % 10 == 0):
+        if (epoch != 0) and (epoch % 1 == 0):
             tl.files.save_npz(net_g.all_params, name=checkpoint_dir+'/g_{}_init.npz'.format(tl.global_flag['mode']), sess=sess)
 
     ###========================= train GAN (SRGAN) =========================###
@@ -266,9 +268,10 @@ def train():
         #     b_imgs_96 = tl.prepro.threading_data(b_imgs_384, fn=downsample_fn)
 
         ## If your machine have enough memory, please pre-load the whole train set.
-        random_idx = list(range(0, len(train_hr_imgs)))
+        fix_length = len(train_hr_imgs) - len(train_hr_imgs) % batch_size
+        random_idx = list(range(0, fix_length))
         random.shuffle(random_idx)
-        for idx in range(0, len(train_hr_imgs), batch_size):
+        for idx in range(0, fix_length, batch_size):
             step_time = time.time()
 
             b_imgs_hr = list()
@@ -300,13 +303,13 @@ def train():
         print(log)
 
         ## quick evaluation on train set
-        if (epoch != 0) and (epoch % 10 == 0):
+        if (epoch != 0) and (epoch % 5 == 0):
             out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
             print("[*] save images")
-            #tl.vis.save_images(out, [ni, ni], save_dir_gan+'/train_%d.png' % epoch)
+            tl.vis.save_images(out, [ni, ni], save_dir_gan+'/train_%d.png' % epoch)
 
         ## save model
-        if (epoch != 0) and (epoch % 10 == 0):
+        if (epoch != 0) and (epoch % 5 == 0):
             tl.files.save_npz(net_g.all_params, name=checkpoint_dir+'/g_{}.npz'.format(tl.global_flag['mode']), sess=sess)
             tl.files.save_npz(net_d.all_params, name=checkpoint_dir+'/d_{}.npz'.format(tl.global_flag['mode']), sess=sess)
 
