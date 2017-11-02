@@ -30,6 +30,7 @@ n_epoch = config.TRAIN.n_epoch
 lr_decay = config.TRAIN.lr_decay
 decay_every = config.TRAIN.decay_every
 use_vgg = config.TRAIN.use_vgg
+use_weighted_mse = config.TRAIN.use_weighted_mse
 ni = int(np.ceil(np.sqrt(batch_size)))
 
 def read_all_imgs(img_list, path='', n_threads=32):
@@ -53,6 +54,20 @@ def read_all_imgs_and_crop(img_list, path='', n_threads=32):
         print('read %d from %s' % (len(imgs), path))
     return imgs
 
+def read_all_split_txt(txt_list, path='', n_threads=32):
+    """Return weight in array by given path and name of each txt"""
+    weight_array = []
+    for idx in range(0, len(txt_list), n_threads):
+        b_txt_list = txt_list[idx: idx + n_threads]
+        b_weight_array = tl.prepro.threading_data(b_txt_list, fn=get_sub_wegiht_array_fn, path=path,
+                                                  sub_img_w=config.TRAIN.img_W, sub_img_h=config.TRAIN.img_H)
+        weight_array.extend(np.concatenate(b_weight_array))
+
+        print('read %d from %s' % (len(weight_array), path))
+
+    return weight_array
+
+
 def train():
     ## create folders to save result images and trained model
     save_dir_ginit = "samples/{}_ginit".format(tl.global_flag['mode'])
@@ -68,7 +83,9 @@ def train():
     train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
     #make sure thr hr_img_path and lr_img_path hava the same imgs
     train_lr_img_list = train_hr_img_list
-     
+    if use_weighted_mse:
+        hevc_split_txt_list = [ i.split('.')[0] + '.txt' for i in train_hr_img_list ]
+
     train_pred_img_list = list()
     for i in train_hr_img_list:
         filename = os.path.splitext(i)[0]
@@ -84,6 +101,10 @@ def train():
     # for im in train_hr_imgs:
     #     print(im.shape)
     train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
+
+    if use_weighted_mse:
+        train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt.path, n_threads=32)
+
     #train_pred_imgs = read_all_imgs_and_crop(train_pred_img_list, path=config.TRAIN.pred_img_path, n_threads=32)
 
     # valid_lr_imgs = read_all_imgs(valid_lr_img_list, path=config.VALID.lr_img_path, n_threads=32)
@@ -98,7 +119,9 @@ def train():
     ## train inference
     t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_image_input_to_SRGAN_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_target_image')
-    t_pred_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_pred_image')
+
+    if use_weighted_mse:
+        t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     
     net_g = SRGAN_g(t_image, is_train=True, reuse=False)
     net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
@@ -123,8 +146,10 @@ def train():
     d_loss = d_loss1 + d_loss2
 
     g_gan_loss = config.TRAIN.gan_loss_lambda * tl.cost.sigmoid_cross_entropy(logits_fake, tf.ones_like(logits_fake), name='g')
-    mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
-
+    if not use_weighted_mse:
+        mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
+    else:
+        mse_loss = tl.cost.weighted_mean_squared_error(net_g.outputs , t_target_image, t_mse_weight, is_mean=True)
     if use_vgg:
         vgg_loss = 2e-6 * tl.cost.mean_squared_error(vgg_predict_emb.outputs, vgg_target_emb.outputs, is_mean=True)
     g_loss = mse_loss + g_gan_loss
@@ -234,13 +259,21 @@ def train():
             step_time = time.time()
             b_imgs_hr = list()
             b_imgs_lr = list()
+            b_weight_arrays = list()
             #b_imgs_pred = list()
             for i in range(batch_size):
                 b_imgs_hr.append(train_hr_imgs[random_idx[idx + i]])
                 b_imgs_lr.append(train_lr_imgs[random_idx[idx + i]])
                 #b_imgs_pred.append(train_pred_imgs[random_idx[idx + i]])
+                b_weight_arrays.append(train_weight_arrays[random_idx[idx + i]])
             ## update G
-            errM, _ , summary= sess.run([mse_loss, g_optim_init, merged], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
+            if use_weighted_mse:
+                errM, _, summary = sess.run([mse_loss, g_optim_init, merged],
+                                            {t_image: b_imgs_lr, t_target_image: b_imgs_hr,
+                                             t_mse_weight: b_weight_arrays})
+            else:
+                errM, _ , summary= sess.run([mse_loss, g_optim_init, merged],
+                                            {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
             train_writer_init.add_summary(summary, total_iter) 
             print("Epoch [%2d/%2d] %4d time: %4.4fs, mse: %.8f " % (epoch, n_epoch_init, n_iter, time.time() - step_time, errM))
             total_mse_loss += errM
