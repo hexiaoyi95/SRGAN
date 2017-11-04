@@ -51,35 +51,87 @@ def SRGAN_g_try(t_image, t_pred_image, is_train=False, reuse=False):
     """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
     feature maps (n) and stride (s) feature maps (n) and stride (s)
     """
-    w_init = tf.random_normal_initializer(stddev=0.02)
-    b_init = None # tf.constant_initializer(value=0.0)
+    w_init = tf.contrib.layers.variance_scaling_initializer()  # tf.random_normal_initializer(stddev=0.02)
+    b_init = tf.constant_initializer(value=0.0)
     g_init = tf.random_normal_initializer(1., 0.02)
     with tf.variable_scope("SRGAN_g", reuse=reuse) as vs:
         tl.layers.set_name_reuse(reuse)
         n = InputLayer(t_image, name='in')
-        temp_input = InputLayer(t_pred_image, name='in')
-        n = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='n64s1/c')
+        n = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='conv1')
         temp = n
 
         # B residual blocks
-        for i in range(16):
-            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c1/%s' % i)
-            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='n64s1/b1/%s' % i)
-            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c2/%s' % i)
-            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='n64s1/b2/%s' % i)
-            nn = ElementwiseLayer([n, nn], tf.add, 'b_residual_add/%s' % i)
+        for i in range(4):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage1/resi_block_%s/c1' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='stage1/resi_block_%s/b1' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage1/resi_block_%s/c2' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='stage1/resi_block_%s/b2' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'stage1/resi_block_%s/add' % i)
+            n = nn
+        stage1 = n
+        n = temp
+        # B residual blocks
+        for i in range(4):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage2-1/resi_block_%s/c1' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='stage2-1/resi_block_%s/b1' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage2-1/resi_block_%s/c2' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='stage2-1/resi_block_%s/b2' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'stage2-1/resi_block_%s/add' % i)
             n = nn
 
-        n = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c/m')
-        n = BatchNormLayer(n, is_train=is_train, gamma_init=g_init, name='n64s1/b/m')
-        n = ElementwiseLayer([n, temp], tf.add, 'add3')
-        # B residual blacks end
+        n = ElementwiseLayer([n, stage1], tf.add, 'add_stage1')
 
-        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='n256s1/1')
+        for i in range(4):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage2-2/resi_block_%s/c1' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='stage2-2/resi_block_%s/b1' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage2-2/resi_block_%s/c2' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='stage2-2/resi_block_%s/b2' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'stage2-2/resi_block_%s/add' % i)
+            n = nn
+        stage2 = n
+        n = temp
+        # B residual blocks
+        for i in range(8):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage3-1/resi_block_%s/c1' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='stage3-1/resi_block_%s/b1' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage3-1/resi_block_%s/c2' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='stage3-1/resi_block_%s/b2' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'stage3-1/resi_block_%s/add' % i)
+            n = nn
 
-        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='n256s1/2')
+        n = ElementwiseLayer([n, stage2], tf.add, 'add_stage2')
 
-        n = Conv2d(n, 1, (1, 1), (1, 1), act=None, padding='SAME', W_init=w_init, name='out')
+        for i in range(8):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage3-2/resi_block_%s/c1' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='stage3-2/resi_block_%s/b1' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,
+                        name='stage3-2/resi_block_%s/c2' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='stage3-2/resi_block_%s/b2' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'stage3-2/resi_block_%s/add' % i)
+            n = nn
+
+        n = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='global/c')
+        n = BatchNormLayer(n, is_train=is_train, gamma_init=g_init, name='global/b')
+        n = ElementwiseLayer([n, temp], tf.add, 'global/add')
+
+        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,
+                   name='conv2')
+        # n = SubpixelConv2d(n, scale=2, n_out_channel=None, act=tf.nn.relu, name='pixelshufflerx2/1')
+
+        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,
+                   name='conv3')
+        # n = SubpixelConv2d(n, scale=2, n_out_channel=None, act=tf.nn.relu, name='pixelshufflerx2/2')
+
+        n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='conv_out')
         return n
 
 def SRGAN_g2(t_image, is_train=False, reuse=False):
