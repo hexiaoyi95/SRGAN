@@ -27,15 +27,17 @@ def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, row_index=0, col_inde
 def get_sub_wegiht_array_fn(file_name, path, sub_img_w, sub_img_h, row_index=0, col_index=1):
     fp = open(path + file_name)
     lines = fp.readlines()
-    last_lx, last_ly, last_rx, last_ry = lines[-1].split(' ')
-    w = last_rx + 1
-    h = last_ry + 1
-    weight_array = np.zeros((w, h),dtype=np.float32)
+    int_list = [ int(i) for i in lines[-1].split(' ')]
+    last_ly, last_lx, last_ry, last_rx, part_size, pre_mode = int_list
+    w = last_ry + 1
+    h = last_rx + 1
+    weight_array = np.zeros((h, w),dtype=np.float32)
     weight_array[0,0:w] = 1.0
     weight_array[0:h,0] = 1.0
 
     for line in lines:
-        lx,ly,rx,ry,part_size,pre_mode= line.split(' ')
+        int_list = [ int(i) for i in line.split(' ')]
+        ly,lx,ry,rx,part_size,pre_mode= int_list
         weight_array[rx, ly:ry+1] = 1.0
         weight_array[lx:rx+1, ry] = 1.0
 

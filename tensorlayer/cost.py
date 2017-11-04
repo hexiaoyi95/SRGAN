@@ -7,7 +7,7 @@ import tensorflow as tf
 import numbers
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import standard_ops
-
+import numpy as np
 ## Cost Functions
 
 def cross_entropy(output, target, name=None):
@@ -103,7 +103,7 @@ def mean_squared_error(output, target, is_mean=False):
         return mse
 
 
-def weighted_mean_squared_error(output, target, weight, is_mean=False):
+def weighted_mean_squared_error(output, target, weight, coe=0.5, is_mean=False):
     # type: (object, object, object, object) -> object
     """Return the TensorFlow expression of mean-squre-error of two distributions.
 
@@ -118,17 +118,22 @@ def weighted_mean_squared_error(output, target, weight, is_mean=False):
     ------------
     - `Wiki Mean Squared Error <https://en.wikipedia.org/wiki/Mean_squared_error>`_
     """
-    with tf.name_scope("mean_squared_error_loss"):
+    with tf.name_scope("weighted_mean_squared_error_loss"):
+        ts_inversed_weight = tf.scalar_mul(1 - coe, tf.add(tf.scalar_mul(-1,weight), 
+                                                            tf.constant(np.ones(weight.get_shape(), dtype=np.float32),
+                                                                shape=weight.get_shape(), dtype=weight.dtype)))
+        ts_weight = tf.scalar_mul(coe,weight)
+        ts_sq_d = tf.squared_difference(output, target)
         if output.get_shape().ndims == 2:   # [batch_size, n_feature]
             if is_mean:
-                mse = tf.reduce_mean(tf.reduce_mean(tf.multiply(tf.squared_difference(output, target)), 1))
+                mse = tf.reduce_mean(tf.reduce_mean(tf.add(tf.multiply(ts_weight,ts_sq_d), tf.multiply(ts_inversed_weight, ts_sq_d))))
             else:
-                mse = tf.reduce_mean(tf.reduce_sum(tf.multiply(tf.squared_difference(output, target)), 1))
+                mse = tf.reduce_mean(tf.reduce_sum(tf.add(tf.multiply(ts_weight,ts_sq_d), tf.multiply(ts_inversed_weight, ts_sq_d)), 1))
         elif output.get_shape().ndims == 4: # [batch_size, w, h, c]
             if is_mean:
-                mse = tf.reduce_mean(tf.reduce_mean(tf.multiply(weight,tf.squared_difference(output, target)), [1, 2, 3]))
+                mse = tf.reduce_mean(tf.reduce_mean(tf.add(tf.multiply(ts_weight,ts_sq_d), tf.multiply(ts_inversed_weight, ts_sq_d)), [1, 2, 3]))
             else:
-                mse = tf.reduce_mean(tf.reduce_sum(tf.multiply(weight,tf.squared_difference(output, target)), [1, 2, 3]))
+                mse = tf.reduce_mean(tf.reduce_sum(tf.add(tf.multiply(ts_weight,ts_sq_d), tf.multiply(ts_inversed_weight, ts_sq_d)), [1, 2, 3]))
         return mse
 
 def normalized_mean_square_error(output, target):

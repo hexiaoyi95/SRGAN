@@ -84,7 +84,7 @@ def train():
     #make sure thr hr_img_path and lr_img_path hava the same imgs
     train_lr_img_list = train_hr_img_list
     if use_weighted_mse:
-        hevc_split_txt_list = [ i.split('.')[0] + '.txt' for i in train_hr_img_list ]
+        hevc_split_txt_list = [ i.rsplit('.',1)[0] + '.txt' for i in train_hr_img_list ]
 
     train_pred_img_list = list()
     for i in train_hr_img_list:
@@ -103,7 +103,7 @@ def train():
     train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
 
     if use_weighted_mse:
-        train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt.path, n_threads=32)
+        train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     #train_pred_imgs = read_all_imgs_and_crop(train_pred_img_list, path=config.TRAIN.pred_img_path, n_threads=32)
 
@@ -149,7 +149,9 @@ def train():
     if not use_weighted_mse:
         mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
     else:
-        mse_loss = tl.cost.weighted_mean_squared_error(net_g.outputs , t_target_image, t_mse_weight, is_mean=True)
+        mse_loss = tl.cost.weighted_mean_squared_error(net_g.outputs , t_target_image, t_mse_weight, coe=config.TRAIN.coe, is_mean=True)
+        
+        orig_mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
     if use_vgg:
         vgg_loss = 2e-6 * tl.cost.mean_squared_error(vgg_predict_emb.outputs, vgg_target_emb.outputs, is_mean=True)
     g_loss = mse_loss + g_gan_loss
@@ -268,14 +270,16 @@ def train():
                 b_weight_arrays.append(train_weight_arrays[random_idx[idx + i]])
             ## update G
             if use_weighted_mse:
-                errM, _, summary = sess.run([mse_loss, g_optim_init, merged],
+                errOrigM, errM, _, summary = sess.run([orig_mse_loss, mse_loss, g_optim_init, merged],
                                             {t_image: b_imgs_lr, t_target_image: b_imgs_hr,
                                              t_mse_weight: b_weight_arrays})
+                print("Epoch [%2d/%2d] %4d time: %4.4fs, weighted_mse: %.8f, origin mse: %.8f" % 
+                                (epoch, n_epoch_init, n_iter, time.time() - step_time, errM, errOrigM))
             else:
                 errM, _ , summary= sess.run([mse_loss, g_optim_init, merged],
                                             {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
+                print("Epoch [%2d/%2d] %4d time: %4.4fs, mse: %.8f " % (epoch, n_epoch_init, n_iter, time.time() - step_time, errM))
             train_writer_init.add_summary(summary, total_iter) 
-            print("Epoch [%2d/%2d] %4d time: %4.4fs, mse: %.8f " % (epoch, n_epoch_init, n_iter, time.time() - step_time, errM))
             total_mse_loss += errM
             n_iter += 1
             total_iter +=1
@@ -331,9 +335,12 @@ def train():
             b_imgs_hr = list()
             b_imgs_lr = list()
             #b_imgs_pred = list()
+            b_weight_arrays = list()
             for i in range(batch_size):
                 b_imgs_hr.append(train_hr_imgs[random_idx[idx + i]])
                 b_imgs_lr.append(train_lr_imgs[random_idx[idx + i]])
+                if use_weighted_mse:
+                    b_weight_arrays.append(train_weight_arrays[random_idx[idx + i]])
             if train_d:
                 errD, _  = sess.run([d_loss, d_optim_apply], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
             ## update G
@@ -342,10 +349,14 @@ def train():
                 print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f vgg: %.6f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errV, errA))
             else:
                 if train_g:
-                    errG, errM, errA , summary, _  = sess.run([g_loss, mse_loss, g_gan_loss, merged, g_optim_apply],{t_image: b_imgs_lr, t_target_image: b_imgs_hr})
-                    
+                    if use_weighted_mse:
+                        errG, errOrigM, errM, errA , summary, _  = sess.run([g_loss, orig_mse_loss, mse_loss, g_gan_loss, merged, g_optim_apply],{t_image: b_imgs_lr, t_target_image: b_imgs_hr, t_mse_weight: b_weight_arrays})
+                        print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f origin_mse: %.8f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errOrigM, errA))
+                    else:
+                        errG, errM, errA , summary, _  = sess.run([g_loss, mse_loss, g_gan_loss, merged, g_optim_apply],{t_image: b_imgs_lr, t_target_image: b_imgs_hr})
+                     
+                        print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errA))
                 train_writer_gan.add_summary(summary, total_iter) 
-                print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errA))
             total_d_loss += errD
             total_g_loss += errG
             n_iter += 1
