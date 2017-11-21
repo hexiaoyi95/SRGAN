@@ -13,13 +13,17 @@ def get_imgs_fn(file_name, path):
     # return scipy.misc.imread(path + file_name).astype(np.float)
     return scipy.misc.imread(path + file_name, mode='RGB')
 
-def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, row_index=0, col_index=1):
+def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
     x = scipy.misc.imread(path + file_name, mode='F')
     x = x / 255
     h, w = x.shape[row_index], x.shape[col_index]
     results = list()
-    for l_w in range(0, w - w%sub_img_w, sub_img_w):
-        for l_h in range(0, h - h%sub_img_h, sub_img_h):
+    for l_w in range(0, w - w%sub_img_w, stride_w):
+        for l_h in range(0, h - h%sub_img_h, stride_h):
+            if l_h + sub_img_h > h:
+                l_h = h - sub_img_h
+            if l_w + sub_img_w > w:
+                l_w = w - sub_img_w
             sub_img = x[l_h:l_h + sub_img_h, l_w:l_w + sub_img_w]
             results.append(sub_img.reshape(sub_img_h,sub_img_w,1))
     return np.asarray(results)
