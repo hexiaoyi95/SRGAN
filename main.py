@@ -31,6 +31,7 @@ lr_decay = config.TRAIN.lr_decay
 decay_every = config.TRAIN.decay_every
 use_vgg = config.TRAIN.use_vgg
 use_weighted_mse = config.TRAIN.use_weighted_mse
+multi_loss = config.TRAIN.multi_loss
 ni = int(np.ceil(np.sqrt(batch_size)))
 
 def read_all_imgs(img_list, path='', n_threads=32):
@@ -43,6 +44,17 @@ def read_all_imgs(img_list, path='', n_threads=32):
         print('read %d from %s' % (len(imgs), path))
     return imgs
 
+def read_all_imgs_with_heatmap_and_crop(img_list, img_path='', txt_path='',  n_threads=32):
+    """Returns cropped sub images of all images in array by given path and name of each image file"""
+    imgs = []
+    for idx in range(0, len(img_list), n_threads):
+        b_imgs_list = img_list[idx: idx + n_threads]
+        b_imgs = tl.prepro.threading_data(b_imgs_list, fn=get_sub_imgs_with_heatmap_fn, img_path=img_path, txt_path=txt_path, sub_img_w=config.TRAIN.img_W,
+                                          sub_img_h=config.TRAIN.img_H, stride_w = config.TRAIN.img_stride_W,
+                                          stride_h = config.TRAIN.img_stride_H)
+        imgs.extend(np.concatenate(b_imgs))
+        print('read %d from %s and %s' % (len(imgs), img_path, txt_path))
+    return imgs
 def read_all_imgs_and_crop(img_list, path='', n_threads=32):
     """Returns cropped sub images of all images in array by given path and name of each image file"""
     imgs = []
@@ -64,7 +76,7 @@ def read_all_split_txt(txt_list, path='', n_threads=32):
                                                   sub_img_w=config.TRAIN.img_W, sub_img_h=config.TRAIN.img_H)
         weight_array.extend(np.concatenate(b_weight_array))
 
-        print('read %d from %s' % (len(weight_array), path))
+        print('read %d from %s'% (len(weight_array), path))
 
     return weight_array
 
@@ -101,7 +113,7 @@ def train():
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
     # for im in train_hr_imgs:
     #     print(im.shape)
-    train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
+    train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
         train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt_path, n_threads=32)
@@ -118,13 +130,16 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_image_input_to_SRGAN_g_try2_concat_generator')
-    t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_target_image')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_SRGAN_g_generator')
+    t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
-    
-    net_g = SRGAN_g_try2_concat(t_image, is_train=True, reuse=False)
+    if multi_loss:
+        net_output = SRGAN_g(t_image, is_train=True, reuse=False)
+        net_g = net_output[2]
+    else:
+        net_g = SRGAN_g(t_image, is_train=True, reuse=False)
     net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
     _,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
@@ -139,7 +154,10 @@ def train():
         _, vgg_predict_emb = Vgg19_simple_api((t_predict_image_224+1)/2, reuse=True)
 
     ## test inference
-    net_g_test = SRGAN_g_try2_concat(t_image, is_train=False, reuse=True)
+    if multi_loss:
+        net_g_test = SRGAN_g(t_image, is_train=False, reuse=True)[2]
+    else:
+        net_g_test = SRGAN_g(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
     d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
@@ -147,10 +165,14 @@ def train():
     d_loss = d_loss1 + d_loss2
 
     g_gan_loss = config.TRAIN.gan_loss_lambda * tl.cost.sigmoid_cross_entropy(logits_fake, tf.ones_like(logits_fake), name='g')
-    if not use_weighted_mse:
-        mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
-    else:
+    if use_weighted_mse:
         mse_loss = tl.cost.weighted_mean_squared_error(net_g.outputs , t_target_image, t_mse_weight, coe=config.TRAIN.coe, is_mean=True)
+    elif multi_loss:
+        mse_loss = 0.2 * tl.cost.mean_squared_error(net_output[0].outputs , t_target_image, is_mean=True) \
+                        + 0.3 * tl.cost.mean_squared_error(net_output[1].outputs, t_target_image, is_mean=True) \
+                        + 0.5 *tl.cost.mean_squared_error(net_output[2].outputs, t_target_image, is_mean=True)
+    else:
+        mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
         
         orig_mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
     if use_vgg:
@@ -160,7 +182,7 @@ def train():
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('SRGAN_g_try2_concat', True, True)
+    g_vars = tl.layers.get_variables_with_name('SRGAN_g', True, True)
     d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
@@ -168,12 +190,8 @@ def train():
     ## Pretrain
     g_optim_init = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(mse_loss, var_list=g_vars)
     ## SRGAN
-    g_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1)
-    d_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1)
-    computed_g_grads = g_optim.compute_gradients(g_loss, var_list=g_vars)
-    g_optim_apply = g_optim.apply_gradients(computed_g_grads)
-    computed_d_grads = d_optim.compute_gradients(d_loss, var_list=d_vars)
-    d_optim_apply = d_optim.apply_gradients(computed_d_grads)
+    g_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(g_loss, var_list=g_vars)
+    d_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(d_loss, var_list=d_vars)
 
     ###========================== RESTORE MODEL =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
@@ -229,11 +247,12 @@ def train():
     #                                              sub_img_h=config.TRAIN.img_H
     #                                              )
     #print('sample LR sub-image:', sample_sub_lr_imgs.min(), sample_sub_lr_imgs.max())
-    print np.asarray(sample_hr_imgs).shape
-    tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_label.png')
-    tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_input.png')
-    tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_gan+'/_train_sample_label.png')
-    tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_gan+'/_train_sample_input.png')
+
+    #print np.asarray(sample_hr_imgs).shape
+    #tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_label.png')
+    #tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_ginit+'/_train_sample_input.png')
+    #tl.vis.save_images(np.asarray(sample_hr_imgs), [ni, ni], save_dir_gan+'/_train_sample_label.png')
+    #tl.vis.save_images(np.asarray(sample_lr_imgs), [ni, ni], save_dir_gan+'/_train_sample_input.png')
 
     ###========================= initialize G ====================###
     ## fixed learning rate
@@ -290,10 +309,10 @@ def train():
         print(log)
 
         ## quick evaluation on train set
-        if (epoch != 0) and (epoch % config.TRAIN.save_init_every == 0):
-            out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
-            print("[*] save images")
-            tl.vis.save_images(out, [ni, ni], save_dir_ginit+'/train_%d.png' % epoch)
+       # if (epoch != 0) and (epoch % config.TRAIN.save_init_every == 0):
+       #     out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
+       #     print("[*] save images")
+       #     tl.vis.save_images(out, [ni, ni], save_dir_ginit+'/train_%d.png' % epoch)
 
         ## save model
         if (epoch != 0) and (epoch % config.TRAIN.save_init_every == 0):
@@ -346,7 +365,7 @@ def train():
                 if use_weighted_mse:
                     b_weight_arrays.append(train_weight_arrays[random_idx[idx + i]])
             if train_d:
-                errD, _  = sess.run([d_loss, d_optim_apply], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
+                errD, _  = sess.run([d_loss, d_optim], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
             ## update G
             if use_vgg:
                 errG, errM, errV, errA, _ = sess.run([g_loss, mse_loss, vgg_loss, g_gan_loss, g_optim], {t_image: b_imgs_lr, t_target_image: b_imgs_hr})
@@ -354,10 +373,10 @@ def train():
             else:
                 if train_g:
                     if use_weighted_mse:
-                        errG, errOrigM, errM, errA , summary, _  = sess.run([g_loss, orig_mse_loss, mse_loss, g_gan_loss, merged, g_optim_apply],{t_image: b_imgs_lr, t_target_image: b_imgs_hr, t_mse_weight: b_weight_arrays})
+                        errG, errOrigM, errM, errA , summary, _  = sess.run([g_loss, orig_mse_loss, mse_loss, g_gan_loss, merged, g_optim],{t_image: b_imgs_lr, t_target_image: b_imgs_hr, t_mse_weight: b_weight_arrays})
                         print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f origin_mse: %.8f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errOrigM, errA))
                     else:
-                        errG, errM, errA , summary, _  = sess.run([g_loss, mse_loss, g_gan_loss, merged, g_optim_apply],{t_image: b_imgs_lr, t_target_image: b_imgs_hr})
+                        errG, errM, errA , summary, _  = sess.run([g_loss, mse_loss, g_gan_loss, merged, g_optim],{t_image: b_imgs_lr, t_target_image: b_imgs_hr})
                      
                         print("Epoch [%2d/%2d] %4d time: %4.4fs, d_loss: %.8f g_loss: %.8f (mse: %.6f adv: %.6f)" % (epoch, n_epoch, n_iter, time.time() - step_time, errD, errG, errM, errA))
                 train_writer_gan.add_summary(summary, total_iter) 
@@ -380,10 +399,10 @@ def train():
         print(log)
 
         ## quick evaluation on train set
-        if (epoch != 0) and (epoch % config.TRAIN.save_every == 0):
-            out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
-            print("[*] save images")
-            tl.vis.save_images(out, [ni, ni], save_dir_gan+'/train_%d.png' % epoch)
+      #  if (epoch != 0) and (epoch % config.TRAIN.save_every == 0):
+      #      out = sess.run(net_g_test.outputs, {t_image: sample_lr_imgs})#; print('gen sub-image:', out.shape, out.min(), out.max())
+      #      print("[*] save images")
+      #      tl.vis.save_images(out, [ni, ni], save_dir_gan+'/train_%d.png' % epoch)
 
         ## save model
         if (epoch != 0) and (epoch % config.TRAIN.save_every == 0):
@@ -426,7 +445,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = SRGAN_g_try2_concat(t_image, is_train=False, reuse=False)
+    net_g = SRGAN_g(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))

@@ -13,9 +13,50 @@ def get_imgs_fn(file_name, path):
     # return scipy.misc.imread(path + file_name).astype(np.float)
     return scipy.misc.imread(path + file_name, mode='RGB')
 
+def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
+    x = scipy.misc.imread(img_path + file_name, mode='F')
+    x = x / 255.
+    #x = x / (255. / 2.)
+    #x = x - 1.
+    h, w = x.shape[row_index], x.shape[col_index]
+    #make heatmap
+    fp = open(txt_path + file_name.rsplit('.',1)[0] + '.txt')
+    lines = fp.readlines()
+    weight_array = np.zeros((h, w),dtype=np.float32)
+    #case 1
+    #weight_array[0:2,0:w] = 1.0
+    #weight_array[0:h,0:2] = 1.0
+    
+    for line in lines:
+        int_list = [ int(i) for i in line.split(' ')]
+        ly,lx,ry,rx,part_size,pre_mode= int_list
+        #case 1
+        #weight_array[rx-1:rx+2, ly:ry+1] = 1.0
+        #weight_array[lx:rx+1, ry-1:ry+2] = 1.0
+
+        #case 2
+        max_depth = 4
+        value = 256/np.power(2,4) * (sub_img_h/(ry-ly)) - 1
+        weight_array[lx:rx+1, ly:ry+1] = value
+
+    results = list()
+    for l_w in range(0, w - w%sub_img_w, stride_w):
+        for l_h in range(0, h - h%sub_img_h, stride_h):
+            if l_h + sub_img_h > h:
+                l_h = h - sub_img_h
+            if l_w + sub_img_w > w:
+                l_w = w - sub_img_w
+            sub_img = x[l_h:l_h + sub_img_h, l_w:l_w + sub_img_w]
+            sub_heatmap = weight_array[l_h:l_h + sub_img_h, l_w:l_w + sub_img_w]
+            results.append(np.stack((sub_img,sub_heatmap),-1))
+    return np.asarray(results)
+    return weight_array
+
 def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
     x = scipy.misc.imread(path + file_name, mode='F')
-    x = x / 255
+    x = x/ 255.
+    #x = x / (255. / 2.)
+    #x = x - 1.0
     h, w = x.shape[row_index], x.shape[col_index]
     results = list()
     for l_w in range(0, w - w%sub_img_w, stride_w):
