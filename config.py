@@ -28,9 +28,9 @@ config.TRAIN.decay_every = int(config.TRAIN.n_epoch / 2)
 config.TRAIN.gan_loss_lambda = 1e-05
 
 ## train set location
-config.TRAIN.hr_img_path = expanduser('~/disk3/train_data/data04_imgs_QP37/label/')
-config.TRAIN.lr_img_path = expanduser('~/disk3/train_data/data04_imgs_QP37/input/')
-config.TRAIN.hevc_split_txt_path = expanduser('~/disk3/train_data/data04_imgs_QP37/txt/')
+config.TRAIN.hr_img_path = expanduser('~/DataSet/data04_imgs_QP37/label/')
+config.TRAIN.lr_img_path = expanduser('~/DataSet/data04_imgs_QP37/input/')
+config.TRAIN.hevc_split_txt_path = expanduser('~/DataSet/data04_imgs_QP37/txt/')
 #config.TRAIN.pred_img_path = expanduser('~/disk3/data/rec_yuv_QP37/pred_img/')
 config.TRAIN.img_stride_W = 64
 config.TRAIN.img_stride_H = 64

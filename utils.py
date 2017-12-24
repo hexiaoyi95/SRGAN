@@ -24,20 +24,20 @@ def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_im
     lines = fp.readlines()
     weight_array = np.zeros((h, w),dtype=np.float32)
     #case 1
-    #weight_array[0:2,0:w] = 1.0
-    #weight_array[0:h,0:2] = 1.0
+    weight_array[0:2,0:w] = 1.0
+    weight_array[0:h,0:2] = 1.0
     
     for line in lines:
         int_list = [ int(i) for i in line.split(' ')]
         ly,lx,ry,rx,part_size,pre_mode= int_list
         #case 1
-        #weight_array[rx-1:rx+2, ly:ry+1] = 1.0
-        #weight_array[lx:rx+1, ry-1:ry+2] = 1.0
+        weight_array[rx-1:rx+2, ly:ry+1] = 1.0
+        weight_array[lx:rx+1, ry-1:ry+2] = 1.0
 
         #case 2
-        max_depth = 4
-        value = 256/np.power(2,4) * (sub_img_h/(ry-ly)) - 1
-        weight_array[lx:rx+1, ly:ry+1] = value
+        #max_depth = 4
+        #value = 256/np.power(2,4) * (sub_img_h/(ry-ly)) - 1
+        #weight_array[lx:rx+1, ly:ry+1] = value
 
     results = list()
     for l_w in range(0, w - w%sub_img_w, stride_w):
