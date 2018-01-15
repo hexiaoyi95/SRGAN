@@ -129,16 +129,16 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_VRCNN_fusion_generator')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_SRGAN_g_fusionHM_2_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     if multi_loss:
-        net_output = VRCNN_fusion(t_image, is_train=True, reuse=False)
+        net_output = SRGAN_g_fusionHM_2(t_image, is_train=True, reuse=False)
         net_g = net_output[2]
     else:
-        net_g = VRCNN_fusion(t_image, is_train=True, reuse=False)
+        net_g = SRGAN_g_fusionHM_2(t_image, is_train=True, reuse=False)
     net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
     _,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
@@ -153,10 +153,10 @@ def train():
         _, vgg_predict_emb = Vgg19_simple_api((t_predict_image_224+1)/2, reuse=True)
 
     ## test inference
-    #if multi_loss:
-    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)[2]
-    #else:
-    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)
+    if multi_loss:
+        net_g_test = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=True)[2]
+    else:
+        net_g_test = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
     d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
@@ -181,7 +181,7 @@ def train():
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('VRCNN_fusion', True, True)
+    g_vars = tl.layers.get_variables_with_name('SRGAN_g_fusionHM_2', True, True)
     d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
@@ -444,7 +444,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = SRGAN_g(t_image, is_train=False, reuse=False)
+    net_g = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
