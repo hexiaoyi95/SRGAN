@@ -11,6 +11,42 @@ from tensorlayer.layers import *
 
 # https://github.com/david-gpu/srez/blob/master/srez_model.py
 
+def VRCNN_fusion(t_image, is_train=False, reuse=False):
+    w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
+    b_init = tf.constant_initializer(value=0.0)
+
+    with tf.variable_scope("VRCNN_fusion") as vs:
+        n = InputLayer(t_image, name='in')
+        n = Conv2d(n, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='f_n64ks7s1')
+        n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='f_n64ks5s1')
+        n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
+        n_1 = Conv2d(n, 16, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks5s1')
+        n_2 = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks3s1')
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
+        n_1 = Conv2d(n, 16, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks3s1')
+        n_2 = Conv2d(n, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks1s1')
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2')
+        n = Conv2d(n, 1, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='out')
+        
+        return n
+
+def VRCNN(t_image, is_train=False, reuse=False):
+    w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
+    b_init = tf.constant_initializer(value=0.0)
+
+    with tf.variable_scope("VRCNN") as vs:
+        n = InputLayer(t_image, name='in')
+        n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
+        n_1 = Conv2d(n, 16, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks5s1')
+        n_2 = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks3s1')
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
+        n_1 = Conv2d(n, 16, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks3s1')
+        n_2 = Conv2d(n, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks1s1')
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2')
+        n = Conv2d(n, 1, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='out')
+        
+        return n
+
 def SRGAN_g(t_image, is_train=False, reuse=False):
     """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
     feature maps (n) and stride (s) feature maps (n) and stride (s)

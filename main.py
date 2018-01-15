@@ -93,17 +93,17 @@ def train():
     ###====================== PRE-LOAD DATA ===========================###
     train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.bmp', printable=False))
     random.shuffle(train_hr_img_list)
-    train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
+    #train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
     #make sure thr hr_img_path and lr_img_path hava the same imgs
     train_lr_img_list = train_hr_img_list
     if use_weighted_mse:
         hevc_split_txt_list = [ i.rsplit('.',1)[0] + '.txt' for i in train_hr_img_list ]
 
     train_pred_img_list = list()
-    for i in train_hr_img_list:
-        filename = os.path.splitext(i)[0]
-        pred_img_dir, pred_img_num = filename.rsplit('_',1)
-        train_pred_img_list.append(os.path.join(pred_img_dir,"{}_pred.bmp".format(5)))
+    #for i in train_hr_img_list:
+    #    filename = os.path.splitext(i)[0]
+    #    pred_img_dir, pred_img_num = filename.rsplit('_',1)
+    #    train_pred_img_list.append(os.path.join(pred_img_dir,"{}_pred.bmp".format(5)))
 
     #train_lr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.lr_img_path, regx='.*.png', printable=False))
     #valid_hr_img_list = sorted(tl.files.load_file_list(path=config.VALID.hr_img_path, regx='.*.png', printable=False))
@@ -111,8 +111,7 @@ def train():
 
     ## If your machine have enough memory, please pre-load the whole train set.
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
-    # for im in train_hr_imgs:
-    #     print(im.shape)
+    #train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
     train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
@@ -130,16 +129,16 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_SRGAN_g_fusionHM_generator')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_VRCNN_fusion_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     if multi_loss:
-        net_output = SRGAN_g_fusionHM(t_image, is_train=True, reuse=False)
+        net_output = VRCNN_fusion(t_image, is_train=True, reuse=False)
         net_g = net_output[2]
     else:
-        net_g = SRGAN_g_fusionHM(t_image, is_train=True, reuse=False)
+        net_g = VRCNN_fusion(t_image, is_train=True, reuse=False)
     net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
     _,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
@@ -154,10 +153,10 @@ def train():
         _, vgg_predict_emb = Vgg19_simple_api((t_predict_image_224+1)/2, reuse=True)
 
     ## test inference
-    if multi_loss:
-        net_g_test = SRGAN_g_fusionHM(t_image, is_train=False, reuse=True)[2]
-    else:
-        net_g_test = SRGAN_g_fusionHM(t_image, is_train=False, reuse=True)
+    #if multi_loss:
+    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)[2]
+    #else:
+    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
     d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
@@ -182,7 +181,7 @@ def train():
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('SRGAN_g_fusionHM', True, True)
+    g_vars = tl.layers.get_variables_with_name('VRCNN_fusion', True, True)
     d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
@@ -445,7 +444,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = SRGAN_g_fusionHM(t_image, is_train=False, reuse=False)
+    net_g = SRGAN_g(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
