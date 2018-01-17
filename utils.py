@@ -35,9 +35,13 @@ def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_im
         #weight_array[lx:rx+1, ry-1:ry+2] = 1.0
 
         #case 2
-        max_depth = 4
-        value = 256/np.power(2,4) * (sub_img_h/(ry-ly)) - 1
-        weight_array[lx:rx+1, ly:ry+1] = value / 255.0
+        #max_depth = 4
+        #value = 256/np.power(2,4) * (sub_img_h/(ry-ly)) - 1
+        #weight_array[lx:rx+1, ly:ry+1] = value / 255.
+
+        #case 3
+        value = np.mean(x[lx:rx+1, ly:ly+1])
+        weight_array[lx:rx+1, ly:ry+1] = value 
 
     results = list()
     for l_w in range(0, w - w%sub_img_w, stride_w):

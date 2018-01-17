@@ -93,17 +93,17 @@ def train():
     ###====================== PRE-LOAD DATA ===========================###
     train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.bmp', printable=False))
     random.shuffle(train_hr_img_list)
-    train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
+    #train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
     #make sure thr hr_img_path and lr_img_path hava the same imgs
     train_lr_img_list = train_hr_img_list
     if use_weighted_mse:
         hevc_split_txt_list = [ i.rsplit('.',1)[0] + '.txt' for i in train_hr_img_list ]
 
     train_pred_img_list = list()
-    for i in train_hr_img_list:
-        filename = os.path.splitext(i)[0]
-        pred_img_dir, pred_img_num = filename.rsplit('_',1)
-        train_pred_img_list.append(os.path.join(pred_img_dir,"{}_pred.bmp".format(5)))
+    #for i in train_hr_img_list:
+    #    filename = os.path.splitext(i)[0]
+    #    pred_img_dir, pred_img_num = filename.rsplit('_',1)
+    #    train_pred_img_list.append(os.path.join(pred_img_dir,"{}_pred.bmp".format(5)))
 
     #train_lr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.lr_img_path, regx='.*.png', printable=False))
     #valid_hr_img_list = sorted(tl.files.load_file_list(path=config.VALID.hr_img_path, regx='.*.png', printable=False))
@@ -111,8 +111,7 @@ def train():
 
     ## If your machine have enough memory, please pre-load the whole train set.
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
-    # for im in train_hr_imgs:
-    #     print(im.shape)
+    #train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
     train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
