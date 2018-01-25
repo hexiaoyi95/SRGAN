@@ -16,10 +16,15 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
     b_init = tf.constant_initializer(value=0.0)
 
     with tf.variable_scope("VRCNN_fusion") as vs:
-        n = InputLayer(t_image, name='in')
-        n = Conv2d(n, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='f_n64ks7s1')
-        n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='f_n64ks5s1')
+        i_img, heatmap = tf.split(t_image, 2, 3)
+
+        n = InputLayer(i_img, name='in')
+        hm = InputLayer(heatmap, name='in_2')
+
         n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
+        n_hm = Conv2d(hm, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1_hm')
+
+        n = ElementwiseLayer([n_hm, n], tf.add, 'hm_add')
         n_1 = Conv2d(n, 16, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks5s1')
         n_2 = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks3s1')
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
@@ -83,6 +88,46 @@ def SRGAN_g(t_image, is_train=False, reuse=False):
         n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='out')
         return n
 
+def SRGAN_g_res(t_image, is_train=False, reuse=False):
+    """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
+    feature maps (n) and stride (s) feature maps (n) and stride (s)
+    """
+    w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
+    b_init = tf.constant_initializer(value=0.0)
+    g_init = tf.random_normal_initializer(1., 0.02)
+    with tf.variable_scope("SRGAN_g_res", reuse=reuse) as vs:
+        tl.layers.set_name_reuse(reuse)
+        n = InputLayer(t_image, name='in')
+        t_input_img, stage1_out = tf.split(t_image, 2, 3)
+        n_input_img = InputLayer(t_input_img)
+        n = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='n64s1/c')
+        temp = n
+
+        # B residual blocks
+        for i in range(32):
+            nn = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c1/%s' % i)
+            nn = BatchNormLayer(nn, act=tf.nn.relu, is_train=is_train, gamma_init=g_init, name='n64s1/b1/%s' % i)
+            nn = Conv2d(nn, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c2/%s' % i)
+            nn = BatchNormLayer(nn, is_train=is_train, gamma_init=g_init, name='n64s1/b2/%s' % i)
+            nn = ElementwiseLayer([n, nn], tf.add, 'b_residual_add/%s' % i)
+            n = nn
+
+        n = Conv2d(n, 64, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='n64s1/c/m')
+        n = BatchNormLayer(n, is_train=is_train, gamma_init=g_init, name='n64s1/b/m')
+        n = ElementwiseLayer([n, temp], tf.add, 'add3')
+        # B residual blacks end
+
+        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n256s1/1')
+        #n = SubpixelConv2d(n, scale=2, n_out_channel=None, act=tf.nn.relu, name='pixelshufflerx2/1')
+        
+        n = Conv2d(n, 256, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n256s1/2')
+        #n = SubpixelConv2d(n, scale=2, n_out_channel=None, act=tf.nn.relu, name='pixelshufflerx2/2')
+
+        n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='out')
+        
+        n = ElementwiseLayer([n, n_input_img] , tf.add, 'out_add')
+
+        return n
 def SRGAN_g_fusionHM(t_image, is_train=False, reuse=False):
     """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
     feature maps (n) and stride (s) feature maps (n) and stride (s)

@@ -29,6 +29,8 @@ n_epoch_init = config.TRAIN.n_epoch_init
 n_epoch = config.TRAIN.n_epoch
 lr_decay = config.TRAIN.lr_decay
 decay_every = config.TRAIN.decay_every
+lr_decay_init = config.TRAIN.lr_decay_init
+decay_every_init = config.TRAIN.decay_every_init
 use_vgg = config.TRAIN.use_vgg
 use_weighted_mse = config.TRAIN.use_weighted_mse
 multi_loss = config.TRAIN.multi_loss
@@ -255,10 +257,19 @@ def train():
 
     ###========================= initialize G ====================###
     ## fixed learning rate
-    sess.run(tf.assign(lr_v, lr_init))
-    print(" ** fixed learning rate: %f (for init G)" % lr_init)
+    #sess.run(tf.assign(lr_v, lr_init))
+    #print(" ** fixed learning rate: %f (for init G)" % lr_init)
     total_iter = 0
     for epoch in range(0, n_epoch_init+1):
+        if epoch !=0 and (epoch % decay_every_init == 0):
+            new_lr_decay = lr_decay_init ** (epoch // decay_every_init)
+            sess.run(tf.assign(lr_v, lr_init * new_lr_decay))
+            log = " ** new learning rate: %f (for init G)" % (lr_init * new_lr_decay)
+            print(log)
+        elif epoch == 0:
+            sess.run(tf.assign(lr_v, lr_init))
+            log = " ** init lr: %f  decay_every_init: %d, lr_decay: %f (for init G)" % (lr_init, decay_every_init, lr_decay_init)
+            print(log)
         epoch_time = time.time()
         total_mse_loss, n_iter = 0, 0
 
