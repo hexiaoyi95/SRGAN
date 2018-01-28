@@ -113,8 +113,8 @@ def train():
 
     ## If your machine have enough memory, please pre-load the whole train set.
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
-    #train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
-    train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
+    train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
+    #train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
         train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt_path, n_threads=32)
@@ -131,21 +131,21 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_SRGAN_g_fusionHM_2_generator')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_QECNN_P_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     if multi_loss:
-        net_output = SRGAN_g_fusionHM_2(t_image, is_train=True, reuse=False)
+        net_output = QECNN_P(t_image, is_train=True, reuse=False)
         net_g = net_output[2]
     else:
-        net_g = SRGAN_g_fusionHM_2(t_image, is_train=True, reuse=False)
-    net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
-    _,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
+        net_g = QECNN_P(t_image, is_train=True, reuse=False)
+    #net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
+    #_,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
     net_g.print_params(False)
-    net_d.print_params(False)
+    #net_d.print_params(False)
     if use_vgg:
     ## vgg inference. 0, 1, 2, 3 BILINEAR NEAREST BICUBIC AREA
         t_target_image_224 = tf.image.resize_images(t_target_image, size=[224, 224], method=0, align_corners=False) # resize_target_image_for_vgg # http://tensorlayer.readthedocs.io/en/latest/_modules/tensorlayer/layers.html#UpSampling2dLayer
@@ -155,17 +155,17 @@ def train():
         _, vgg_predict_emb = Vgg19_simple_api((t_predict_image_224+1)/2, reuse=True)
 
     ## test inference
-    if multi_loss:
-        net_g_test = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=True)[2]
-    else:
-        net_g_test = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=True)
+    #if multi_loss:
+    #    net_g_test = QECNN_P(t_image, is_train=False, reuse=True)[2]
+    #else:
+    #    net_g_test = QECNN_P(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
-    d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
-    d_loss2 = tl.cost.sigmoid_cross_entropy(logits_fake, tf.zeros_like(logits_fake), name='d2')
-    d_loss = d_loss1 + d_loss2
+    #d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
+    #d_loss2 = tl.cost.sigmoid_cross_entropy(logits_fake, tf.zeros_like(logits_fake), name='d2')
+    #d_loss = d_loss1 + d_loss2
 
-    g_gan_loss = config.TRAIN.gan_loss_lambda * tl.cost.sigmoid_cross_entropy(logits_fake, tf.ones_like(logits_fake), name='g')
+    #g_gan_loss = config.TRAIN.gan_loss_lambda * tl.cost.sigmoid_cross_entropy(logits_fake, tf.ones_like(logits_fake), name='g')
     if use_weighted_mse:
         mse_loss = tl.cost.weighted_mean_squared_error(net_g.outputs , t_target_image, t_mse_weight, coe=config.TRAIN.coe, is_mean=True)
     elif multi_loss:
@@ -175,24 +175,25 @@ def train():
     else:
         mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
         
-        orig_mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
+        #orig_mse_loss = tl.cost.mean_squared_error(net_g.outputs , t_target_image, is_mean=True)
     if use_vgg:
         vgg_loss = 2e-6 * tl.cost.mean_squared_error(vgg_predict_emb.outputs, vgg_target_emb.outputs, is_mean=True)
-    g_loss = mse_loss + g_gan_loss
+    #g_loss = mse_loss + g_gan_loss
 
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('SRGAN_g_fusionHM_2', True, True)
-    d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
+    g_vars = tl.layers.get_variables_with_name('QECNN_P', True, True)
+    #d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
         lr_v = tf.Variable(lr_init, trainable=False)
     ## Pretrain
-    g_optim_init = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(mse_loss, var_list=g_vars)
+    #g_optim_init = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(mse_loss, var_list=g_vars)
+    g_optim_init = tf.train.GradientDescentOptimizer(lr_v).minimize(mse_loss, var_list=g_vars)
     ## SRGAN
-    g_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(g_loss, var_list=g_vars)
-    d_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(d_loss, var_list=d_vars)
+    #g_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(g_loss, var_list=g_vars)
+    #d_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(d_loss, var_list=d_vars)
 
     ###========================== RESTORE MODEL =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
@@ -200,9 +201,9 @@ def train():
     #sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 	###============================= SUMMARY  ===============================###
     tf.summary.scalar('mse_loss', mse_loss)
-    tf.summary.scalar('g_gan_loss', g_gan_loss)
-    tf.summary.scalar('d_loss', d_loss)
-    tf.summary.scalar('g_loss', g_loss)
+    #tf.summary.scalar('g_gan_loss', g_gan_loss)
+    #tf.summary.scalar('d_loss', d_loss)
+    #tf.summary.scalar('g_loss', g_loss)
 
 
     merged = tf.summary.merge_all()
@@ -213,7 +214,7 @@ def train():
     if tl.files.load_and_assign_npz(sess=sess, name=checkpoint_dir+'/g_{}.npz'.format(tl.global_flag['mode']), network=net_g) is False:
         tl.files.load_and_assign_npz(sess=sess, name=checkpoint_dir+'/g_{}_init.npz'.format(tl.global_flag['mode']), network=net_g)
 
-    tl.files.load_and_assign_npz(sess=sess, name=checkpoint_dir+'/d_{}.npz'.format(tl.global_flag['mode']), network=net_d)
+    #tl.files.load_and_assign_npz(sess=sess, name=checkpoint_dir+'/d_{}.npz'.format(tl.global_flag['mode']), network=net_d)
 
     ###============================= LOAD VGG ===============================###
     if use_vgg:
@@ -455,7 +456,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=False)
+    net_g = QECNN_P(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))

@@ -54,7 +54,7 @@ def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_im
             sub_heatmap = weight_array[l_h:l_h + sub_img_h, l_w:l_w + sub_img_w]
             results.append(np.stack((sub_img,sub_heatmap),-1))
     return np.asarray(results)
-    return weight_array
+    #return weight_array
 
 def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
     x = scipy.misc.imread(path + file_name, mode='F')
