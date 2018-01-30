@@ -12,6 +12,43 @@ from tensorlayer.layers import *
 # https://github.com/david-gpu/srez/blob/master/srez_model.py
 
 
+def QECNN_P_fusion(t_image, is_train=False, reuse=False):
+    w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
+    b_init = tf.constant_initializer(value=0.0)
+
+    with tf.variable_scope("QECNN_P_fusion", reuse=reuse) as vs:
+        i_img, heatmap = tf.split(t_image, 2, 3)
+        n = InputLayer(i_img, name='in')
+        temp = n
+
+        hm = InputLayer(heatmap, name='in_2')
+        n_hm = Conv2d(hm, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1_hm')
+        n_hm = Conv2d(n_hm, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks3s1_hm')
+
+        n_1 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv1')
+        n_2 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv5')
+        
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
+        n_1 = Conv2d(n_1, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv2')
+        n_2 = Conv2d(n, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv6')
+
+        
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2') 
+        n_1 = Conv2d(n_1, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv3')
+        n_2 = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv7')
+
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_3') 
+        n_1 = Conv2d(n_1, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv4')
+        n_2 = Conv2d(n, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv8')
+
+        n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_4') 
+        n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
+        n = ConcatLayer(layer = [n, n_hm], concat_dim=3, name='concat_fusion')
+        n = Conv2d(n, 1, (5, 5), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='conv9')
+    
+        n = ElementwiseLayer([temp, n], tf.add, 'add')
+
+        return n
 def QECNN_P(t_image, is_train=False, reuse=False):
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
     b_init = tf.constant_initializer(value=0.0)
@@ -65,7 +102,9 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2')
 
         n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
-        n = ConcatLayer(layer = [n, n_hm], concat_dim=3, name='concat_fusion')
+        n = ElementwiseLayer([n_hm, n], tf.add, 'add_fusion')
+
+        n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='conv_fusion')
 
         n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,name='out')
         
