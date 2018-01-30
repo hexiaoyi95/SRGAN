@@ -23,6 +23,7 @@ cur_date =  datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 batch_size = config.TRAIN.batch_size
 lr_init = config.TRAIN.lr_init
 beta1 = config.TRAIN.beta1
+clip_beta = config.TRAIN.clip_beta
 ## initialize G
 n_epoch_init = config.TRAIN.n_epoch_init
 ## adversarial learning (SRGAN)
@@ -95,7 +96,6 @@ def train():
     ###====================== PRE-LOAD DATA ===========================###
     train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.bmp', printable=False))
     random.shuffle(train_hr_img_list)
-    #train_hr_img_list = train_hr_img_list[:len(train_hr_img_list)/2]
     #make sure thr hr_img_path and lr_img_path hava the same imgs
     train_lr_img_list = train_hr_img_list
     if use_weighted_mse:
@@ -113,8 +113,8 @@ def train():
 
     ## If your machine have enough memory, please pre-load the whole train set.
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
-    train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
-    #train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
+    #train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
+    train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
         train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt_path, n_threads=32)
@@ -131,16 +131,16 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_QECNN_P_generator')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_VRCNN_fusion_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     if multi_loss:
-        net_output = QECNN_P(t_image, is_train=True, reuse=False)
+        net_output = VRCNN_fusion(t_image, is_train=True, reuse=False)
         net_g = net_output[2]
     else:
-        net_g = QECNN_P(t_image, is_train=True, reuse=False)
+        net_g = VRCNN_fusion(t_image, is_train=True, reuse=False)
     #net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
     #_,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
@@ -156,9 +156,9 @@ def train():
 
     ## test inference
     #if multi_loss:
-    #    net_g_test = QECNN_P(t_image, is_train=False, reuse=True)[2]
+    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)[2]
     #else:
-    #    net_g_test = QECNN_P(t_image, is_train=False, reuse=True)
+    #    net_g_test = VRCNN_fusion(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
     #d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
@@ -183,14 +183,21 @@ def train():
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('QECNN_P', True, True)
+    g_vars = tl.layers.get_variables_with_name('VRCNN_fusion', True, True)
     #d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
         lr_v = tf.Variable(lr_init, trainable=False)
+    with tf.variable_scope('clip_beta'):
+        clip_beta_v = tf.Variable(clip_beta/lr_init, trainable=False)
     ## Pretrain
-    #g_optim_init = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(mse_loss, var_list=g_vars)
-    g_optim_init = tf.train.GradientDescentOptimizer(lr_v).minimize(mse_loss, var_list=g_vars)
+    g_optim_init = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(mse_loss, var_list=g_vars)
+    #g_optim_init = tf.train.GradientDescentOptimizer(lr_v).minimize(mse_loss, var_list=g_vars)
+   # opt = tf.train.GradientDescentOptimizer(lr_v)
+   # gradients_and_vars = opt.compute_gradients(mse_loss, g_vars)
+   # gradients = [ i[0] for i in gradients_and_vars]
+   # clipped_gradients, norm =  tf.clip_by_global_norm(gradients, clip_beta)
+   # g_optim_init = opt.apply_gradients(zip(clipped_gradients, g_vars))
     ## SRGAN
     #g_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(g_loss, var_list=g_vars)
     #d_optim = tf.train.AdamOptimizer(lr_v, beta1=beta1).minimize(d_loss, var_list=d_vars)
@@ -265,6 +272,7 @@ def train():
         if epoch !=0 and (epoch % decay_every_init == 0):
             new_lr_decay = lr_decay_init ** (epoch // decay_every_init)
             sess.run(tf.assign(lr_v, lr_init * new_lr_decay))
+            #sess.run(tf.assign(clip_beta_v, clip_beta / new_lr_decay)) 
             log = " ** new learning rate: %f (for init G)" % (lr_init * new_lr_decay)
             print(log)
         elif epoch == 0:
@@ -456,7 +464,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = QECNN_P(t_image, is_train=False, reuse=False)
+    net_g = VRCNN_fusion(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))

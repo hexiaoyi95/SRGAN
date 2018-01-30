@@ -41,9 +41,6 @@ def QECNN_P(t_image, is_train=False, reuse=False):
         n = ElementwiseLayer([temp, n], tf.add, 'add')
 
         return n
-
-
-        
     
 def VRCNN_fusion(t_image, is_train=False, reuse=False):
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
@@ -53,10 +50,12 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
         i_img, heatmap = tf.split(t_image, 2, 3)
 
         n = InputLayer(i_img, name='in')
+        temp = n
         hm = InputLayer(heatmap, name='in_2')
 
         n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
         n_hm = Conv2d(hm, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1_hm')
+        n_hm = Conv2d(n_hm, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks3s1_hm')
 
         n = ElementwiseLayer([n_hm, n], tf.add, 'hm_add')
         n_1 = Conv2d(n, 16, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks5s1')
@@ -67,6 +66,8 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2')
         n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,name='out')
         
+        n = ElementwiseLayer([temp, n], tf.add, 'add')
+
         return n
 
 def VRCNN(t_image, is_train=False, reuse=False):
