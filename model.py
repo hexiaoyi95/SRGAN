@@ -55,15 +55,18 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
 
         n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
         n_hm = Conv2d(hm, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1_hm')
-        n_hm = Conv2d(n_hm, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks3s1_hm')
+        n_hm = Conv2d(n_hm, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks3s1_hm')
 
-        n = ElementwiseLayer([n_hm, n], tf.add, 'hm_add')
         n_1 = Conv2d(n, 16, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks5s1')
         n_2 = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks3s1')
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
         n_1 = Conv2d(n, 16, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n16ks3s1')
         n_2 = Conv2d(n, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='n32ks1s1')
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2')
+
+        n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
+        n = ConcatLayer(layer = [n, n_hm], concat_dim=3, name='concat_fusion')
+
         n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init,name='out')
         
         n = ElementwiseLayer([temp, n], tf.add, 'add')
