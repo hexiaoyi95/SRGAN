@@ -43,7 +43,7 @@ def QECNN_P_fusion(t_image, is_train=False, reuse=False):
 
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_4') 
         n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
-        n = ConcatLayer(layer = [n, n_hm], concat_dim=3, name='concat_fusion')
+        n = ElementwiseLayer([n_hm, n], tf.add, 'add_fusion')
         n = Conv2d(n, 1, (5, 5), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='conv9')
     
         n = ElementwiseLayer([temp, n], tf.add, 'add')
