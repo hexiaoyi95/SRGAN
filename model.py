@@ -22,8 +22,9 @@ def QECNN_P_fusion(t_image, is_train=False, reuse=False):
         temp = n
 
         hm = InputLayer(heatmap, name='in_2')
-        n_hm = Conv2d(hm, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1_hm')
-        n_hm = Conv2d(n_hm, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks3s1_hm')
+        n_hm = Conv2d(hm, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n128ks9s1_hm')
+        n_hm = Conv2d(n_hm, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks7s1_hm')
+        n_hm = Conv2d(n_hm, 32, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n32ks5s1_hm')
 
         n_1 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv1')
         n_2 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv5')
@@ -42,8 +43,9 @@ def QECNN_P_fusion(t_image, is_train=False, reuse=False):
         n_2 = Conv2d(n, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv8')
 
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_4') 
-        n = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
-        n = ElementwiseLayer([n_hm, n], tf.add, 'add_fusion')
+        n = Conv2d(n, 32, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='img_path')
+        n = ElementwiseLayer([n_hm, n], tf.add, 'fusion_add')
+        n = Conv2d(n, 32, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init,name='fusion_1')
         n = Conv2d(n, 1, (5, 5), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='conv9')
     
         n = ElementwiseLayer([temp, n], tf.add, 'add')
