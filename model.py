@@ -22,21 +22,20 @@ def QECNN_P_fusion(t_image, is_train=False, reuse=False):
         temp = n
 
         hm = InputLayer(heatmap, name='in_2')
-        n_hm = Conv2d(hm, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n128ks9s1_hm')
-        n_hm = Conv2d(n_hm, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks7s1_hm')
-        n_hm = Conv2d(n_hm, 32, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n32ks5s1_hm')
+        n_hm = Conv2d(hm, 64, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n128ks9s1_hm')
+        n_hm = Conv2d(n_hm, 32, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks7s1_hm')
 
-        n_1 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv1')
-        n_2 = Conv2d(n, 128, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv5')
+        n_1 = Conv2d(n, 64, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv1')
+        n_2 = Conv2d(n, 64, (9, 9), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv5')
         
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_1')
-        n_1 = Conv2d(n_1, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv2')
-        n_2 = Conv2d(n, 64, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv6')
+        n_1 = Conv2d(n_1, 32, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv2')
+        n_2 = Conv2d(n, 32, (7, 7), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv6')
 
         
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_2') 
-        n_1 = Conv2d(n_1, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv3')
-        n_2 = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv7')
+        n_1 = Conv2d(n_1, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv3')
+        n_2 = Conv2d(n, 32, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv7')
 
         n = ConcatLayer(layer = [n_1, n_2], concat_dim=3, name='concat_3') 
         n_1 = Conv2d(n_1, 32, (1, 1), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='conv4')
