@@ -248,14 +248,14 @@ def SRGAN_g_fusionHM(t_image, is_train=False, reuse=False):
         n = Conv2d(n, 1, (3, 3), (1, 1), act=None, padding='SAME', W_init=w_init, b_init=b_init, name='out')
         return n
 
-def SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=False):
+def SRGAN_g_fusionHM_2(t_image, is_train=False, reuse=False, name='SRGAN_g_fusionHM_2'):
     """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
     feature maps (n) and stride (s) feature maps (n) and stride (s)
     """
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
     b_init = tf.constant_initializer(value=0.0)
     g_init = tf.random_normal_initializer(1., 0.02)
-    with tf.variable_scope("SRGAN_g_fusionHM_2", reuse=reuse) as vs:
+    with tf.variable_scope(name, reuse=reuse) as vs:
         i_img, heatmap = tf.split(t_image, 2, 3)
         tl.layers.set_name_reuse(reuse)
         n = InputLayer(i_img, name='in')

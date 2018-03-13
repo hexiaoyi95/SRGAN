@@ -15,7 +15,10 @@ def get_imgs_fn(file_name, path):
 
 def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
     x = scipy.misc.imread(img_path + file_name, mode='F')
-    x = x / 255.
+    if os.path.basename(file_name).split('.')[1] == 'png':
+        x = x/ 1023.
+    else:
+        x = x/ 255.
     #x = x / (255. / 2.)
     #x = x - 1.
     h, w = x.shape[row_index], x.shape[col_index]
@@ -58,7 +61,10 @@ def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_im
 
 def get_sub_imgs_fn(file_name, path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
     x = scipy.misc.imread(path + file_name, mode='F')
-    x = x/ 255.
+    if os.path.basename(file_name).split('.')[1] == 'png':
+        x = x/ 1023.
+    else:
+        x = x/ 255.
     #x = x / (255. / 2.)
     #x = x - 1.0
     h, w = x.shape[row_index], x.shape[col_index]

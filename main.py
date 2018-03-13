@@ -19,6 +19,7 @@ from datetime import datetime
 cur_date =  datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 ###====================== HYPER-PARAMETERS ===========================###
+qp = config.TRAIN.QP
 ## Adam
 batch_size = config.TRAIN.batch_size
 lr_init = config.TRAIN.lr_init
@@ -94,10 +95,14 @@ def train():
     tl.files.exists_or_mkdir(checkpoint_dir)
 
     ###====================== PRE-LOAD DATA ===========================###
-    train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.bmp', printable=False))
+    train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.png', printable=False))
     random.shuffle(train_hr_img_list)
     #make sure thr hr_img_path and lr_img_path hava the same imgs
-    train_lr_img_list = train_hr_img_list
+    train_lr_img_list = list()
+    for i in train_hr_img_list:
+        name,ext = os.path.splitext(i)
+        part1, part2 = name.rsplit('_',1)
+        train_lr_img_list.append(part1 + '_QP%d' % qp + '_' + part2 + ext)
     if use_weighted_mse:
         hevc_split_txt_list = [ i.rsplit('.',1)[0] + '.txt' for i in train_hr_img_list ]
 
@@ -113,8 +118,8 @@ def train():
 
     ## If your machine have enough memory, please pre-load the whole train set.
     train_hr_imgs = read_all_imgs_and_crop(train_hr_img_list, path=config.TRAIN.hr_img_path, n_threads=32)
-    #train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
-    train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
+    train_lr_imgs = read_all_imgs_and_crop(train_lr_img_list, path=config.TRAIN.lr_img_path, n_threads=32)
+    #train_lr_imgs = read_all_imgs_with_heatmap_and_crop(train_lr_img_list, img_path=config.TRAIN.lr_img_path, txt_path=config.TRAIN.hevc_split_txt_path, n_threads=32)
 
     if use_weighted_mse:
         train_weight_arrays = read_all_split_txt(hevc_split_txt_list, path=config.TRAIN.hevc_split_txt_path, n_threads=32)
@@ -131,16 +136,16 @@ def train():
 
     ###========================== DEFINE MODEL ============================###
     ## train inference
-    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_QECNN_P_fusion_generator')
+    t_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.input_img_C], name='t_image_input_to_SRGAN_g_generator')
     t_target_image = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.target_img_C], name='t_target_image')
 
     if use_weighted_mse:
         t_mse_weight = tf.placeholder('float32', [batch_size, config.TRAIN.img_W, config.TRAIN.img_H, config.TRAIN.img_C], name='t_mse_weight')
     if multi_loss:
-        net_output = QECNN_P_fusion(t_image, is_train=True, reuse=False)
+        net_output = SRGAN_g(t_image, is_train=True, reuse=False)
         net_g = net_output[2]
     else:
-        net_g = QECNN_P_fusion(t_image, is_train=True, reuse=False)
+        net_g = SRGAN_g(t_image, is_train=True, reuse=False)
     #net_d, logits_real = SRGAN_d(t_target_image, is_train=True, reuse=False)
     #_,     logits_fake = SRGAN_d(net_g.outputs, is_train=True, reuse=True)
 
@@ -156,9 +161,9 @@ def train():
 
     ## test inference
     #if multi_loss:
-    #    net_g_test = QECNN_P_fusion(t_image, is_train=False, reuse=True)[2]
+    #    net_g_test = SRGAN_g(t_image, is_train=False, reuse=True)[2]
     #else:
-    #    net_g_test = QECNN_P_fusion(t_image, is_train=False, reuse=True)
+    #    net_g_test = SRGAN_g(t_image, is_train=False, reuse=True)
 
     # ###========================== DEFINE TRAIN OPS ==========================###
     #d_loss1 = tl.cost.sigmoid_cross_entropy(logits_real, tf.ones_like(logits_real), name='d1')
@@ -183,7 +188,7 @@ def train():
     if use_vgg:
         g_loss += vgg_loss
 
-    g_vars = tl.layers.get_variables_with_name('QECNN_P_fusion', True, True)
+    g_vars = tl.layers.get_variables_with_name('SRGAN_g', True, True)
     #d_vars = tl.layers.get_variables_with_name('SRGAN_d', True, True)
 
     with tf.variable_scope('learning_rate'):
@@ -464,7 +469,7 @@ def evaluate():
     t_image = tf.placeholder('float32', [None, size[0], size[1], size[2]], name='input_image')
     # t_image = tf.placeholder('float32', [1, None, None, 3], name='input_image')
 
-    net_g = QECNN_P_fusion(t_image, is_train=False, reuse=False)
+    net_g = SRGAN_g(t_image, is_train=False, reuse=False)
 
     ###========================== RESTORE G =============================###
     sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, log_device_placement=False))
