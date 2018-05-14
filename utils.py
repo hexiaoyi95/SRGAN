@@ -19,8 +19,6 @@ def get_sub_imgs_with_heatmap_fn(file_name, img_path,txt_path, sub_img_w, sub_im
         x = x/ 1023.
     else:
         x = x/ 255.
-    #x = x / (255. / 2.)
-    #x = x - 1.
     h, w = x.shape[row_index], x.shape[col_index]
     #make heatmap
     fp = open(txt_path + file_name.rsplit('.',1)[0] + '.txt')

@@ -80,11 +80,12 @@ def QECNN_P(t_image, is_train=False, reuse=False):
 
         return n
     
-def VRCNN_fusion(t_image, is_train=False, reuse=False):
+def VRCNN_fusion(t_image, is_train=False, reuse=False, scope='vrcnn_fusion'):
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
     b_init = tf.constant_initializer(value=0.0)
 
-    with tf.variable_scope("VRCNN_fusion") as vs:
+    with tf.variable_scope(scope, reuse=reuse) as vs:
+        tl.layers.set_name_reuse(reuse)
         i_img, heatmap = tf.split(t_image, 2, 3)
 
         n = InputLayer(i_img, name='in')
@@ -113,11 +114,13 @@ def VRCNN_fusion(t_image, is_train=False, reuse=False):
 
         return n
 
-def VRCNN(t_image, is_train=False, reuse=False):
+
+def VRCNN(t_image, is_train=False, reuse=False, scope="VRCNN"):
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
     b_init = tf.constant_initializer(value=0.0)
 
-    with tf.variable_scope("VRCNN", reuse=reuse) as vs:
+    with tf.variable_scope(scope, reuse=reuse) as vs:
+        tl.layers.set_name_reuse(reuse)
         n = InputLayer(t_image, name='in')
         temp = n
         n = Conv2d(n, 64, (5, 5), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, b_init=b_init, name='n64ks5s1')
@@ -133,14 +136,14 @@ def VRCNN(t_image, is_train=False, reuse=False):
         
         return n
 
-def SRGAN_g(t_image, is_train=False, reuse=False):
+def SRGAN_g(t_image, is_train=False, reuse=False, scope='SRGAN_g'):
     """ Generator in Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network
     feature maps (n) and stride (s) feature maps (n) and stride (s)
     """
     w_init = tf.contrib.layers.variance_scaling_initializer() #tf.random_normal_initializer(stddev=0.02)
     b_init = tf.constant_initializer(value=0.0)
     g_init = tf.random_normal_initializer(1., 0.02)
-    with tf.variable_scope("SRGAN_g", reuse=reuse) as vs:
+    with tf.variable_scope(scope, reuse=reuse) as vs:
         tl.layers.set_name_reuse(reuse)
         n = InputLayer(t_image, name='in')
         n = Conv2d(n, 64, (3, 3), (1, 1), act=tf.nn.relu, padding='SAME', W_init=w_init, name='n64s1/c')
