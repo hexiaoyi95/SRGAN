@@ -557,7 +557,7 @@ def train_multiple():
     # tl.files.exists_or_mkdir(save_dir_ginit)
     checkpoint_dir = "checkpoint"  # checkpoint_resize_conv
     tl.files.exists_or_mkdir(checkpoint_dir)
-    target_models_num = 2
+    target_models_num = 4
     ###====================== PRE-LOAD DATA ===========================###
     train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.bmp', printable=False))
     random.shuffle(train_hr_img_list)
@@ -609,40 +609,29 @@ def train_multiple():
         with slim.arg_scope(resnet_v2.resnet_arg_scope()):
             logits, endpoints = resnet_v2.resnet_v2_50(inputs=t_image_2, num_classes=target_models_num,
                                                        reuse=False, is_training=True)
-        # checkpoint_exclude_scopes = ["resnet_v2_50/conv1", "resnet_v2_50/logits"]
-        # exclusions = [scope.strip() for scope in checkpoint_exclude_scopes]
-        #
-        # variables_to_restore = []
-        # for var in slim.get_model_variables('resnet_v2_50'):
-        #    excluded = False
-        #    for exclusion in exclusions:
-        #        if var.op.name.startswith(exclusion):
-        #            excluded = True
-        #            break
-        #    if not excluded:
-        #        variables_to_restore.append(var)
+        checkpoint_exclude_scopes = ["resnet_v2_50/conv1", "resnet_v2_50/logits"]
+        exclusions = [scope.strip() for scope in checkpoint_exclude_scopes]
 
-        # init_fn = slim.assign_from_checkpoint_fn(
-        #    '/home/l301/disk3/tensorflow_model/resnet_v2_50.ckpt',
-        #    variables_to_restore)
+        variables_to_restore = []
+        for var in slim.get_model_variables('resnet_v2_50'):
+           excluded = False
+           for exclusion in exclusions:
+               if var.op.name.startswith(exclusion):
+                   excluded = True
+                   break
+           if not excluded:
+               variables_to_restore.append(var)
+
+        init_fn = slim.assign_from_checkpoint_fn(
+           '/home/l301/DataSet2/tensorflow_model/resnet_v2_50.ckpt',
+           variables_to_restore)
+        
         saver = tf.train.Saver(var_list=slim.get_model_variables('resnet_v2_50'))
 
         softmax_loss = tl.cost.cross_entropy(logits, t_labels, 'softmax_loss')
         softmax_opt = tf.train.AdamOptimizer(lr_v_2, beta1=beta1).minimize(softmax_loss,
                                                                            var_list=slim.get_model_variables(
                                                                                'resnet_v2_50'))
-        # print tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='resnet_v2_50')
-        # for i in  g_2.get_operations():
-        #    print i.name
-        # logits = g_2.get_tensor_by_name('resnet_v2_50/SpatialSqueeze:0')
-        #
-        # endpoints = {'predictions': g_2.get_tensor_by_name('resnet_v2_50/predictions/Softmax:0')}
-
-        # softmax_opt = g_2.get_operation_by_name('Adam')
-        # softmax_loss = g_2.get_tensor_by_name('softmax_loss/softmax_loss:0')
-        # lr_v_2 = g_2.get_tensor_by_name('learning_rate_2/Variable:0')
-        # t_image_2 = g_2.get_tensor_by_name('t_image_input_2:0')
-        # t_labels = g_2.get_tensor_by_name('classify_labels:0')
 
         tf.summary.scalar('softmax_loss', softmax_loss)
         merged_2 = tf.summary.merge_all()
@@ -654,7 +643,7 @@ def train_multiple():
         # init_fn(sess_2)
 
         # Fine-tune
-        saver.restore(sess_2, tf.train.latest_checkpoint('./checkpoint_vrcnn_fusion_multipleNets_split0_iter2/'))
+        saver.restore(sess_2, tf.train.latest_checkpoint('./checkpoint_vrcnn_fusion_resiClass'))
 
     with g_1.as_default():
 
@@ -685,26 +674,32 @@ def train_multiple():
 
         for ii, nn in enumerate(nets):
             tl.files.load_and_assign_npz(sess=sess_1,
-                                         name='./checkpoint_vrcnn_fusion_multipleNets_split0_iter2' + '/{}_{}_epoch{}.npz'.format(
+                                         name='./checkpoint_vrcnn_fusion_resiClass' + '/{}_{}_epoch{}.npz'.format(
                                              str(ii),
-                                             tl.global_flag['mode'], 60), network=nn)
+                                             tl.global_flag['mode'], 40), network=nn)
             # tl.files.load_and_assign_npz(sess=sess_1,
-            #                              name='/home/l301/disk3/tensorflow_model/checkpoint_data04_netVRCNN-fusion-QP22/g_srgan_init_epoch40.npz',
+            #                              name='/home/l301/DataSet2/tensorflow_model/checkpoint_data04_netVRCNN-fusion-QP22/g_srgan_init_epoch40.npz',
             #                              network=nn)
     ## If your machine have enough memory, please pre-load the whole train set.
     # the last 10000 sub-images used to validate
 
     fix_length = len(train_hr_imgs) - len(train_hr_imgs) % batch_size
-    # random_idx = list(range(0, fix_length))
-    # random.shuffle(random_idx)
-    random_idx = pickle.load(open('./train_dataset_split0'))
+
+    random_idx = list(range(0, fix_length))
+    random.shuffle(random_idx)
+
+    # random_idx = pickle.load(open('./train_dataset_split0'))
+    labels_by_rmac = np.load(open('/home/l301/temp_labels.npy'))
     test_num = 10000
     test_rand_idx = random_idx[:test_num]
     total_train_rand_idx = random_idx[test_num:]
+
     # with open('train_dataset_idx_' + cur_date, 'w') as pk_fp:
     #     pickle.dump(total_train_rand_idx, pk_fp)
     #     pk_fp.close()
-    train_rand_idx = total_train_rand_idx[:len(total_train_rand_idx) / 2]
+
+    train_rand_idx = total_train_rand_idx
+    # train_rand_idx = total_train_rand_idx[:len(total_train_rand_idx) / 2]
     # train_rand_idx = total_train_rand_idx[len(total_train_rand_idx) / 2:]
     print "Using the last 10000 sub-images to validate, the first half of rest are used to train"
     train_labels = []
@@ -748,16 +743,25 @@ def train_multiple():
             b_imgs_hr = list()
             b_imgs_lr = list()
             b_imgs_lr_single_c = list()
+            b_imgs_resi = list()
             for i in range(batch_size):
                 b_imgs_hr.append(train_hr_imgs[train_rand_idx[idx + i]])
                 b_imgs_lr.append(train_lr_imgs[train_rand_idx[idx + i]])
+
                 if config.TRAIN.input_img_C == 1:
                     b_imgs_lr_single_c.append(train_lr_imgs[train_rand_idx[idx + i]])
+                    b_imgs_resi.append(
+                        abs(train_lr_imgs[train_rand_idx[idx + i]] - train_hr_imgs[train_rand_idx[idx + i]]))
                 else:
                     b_imgs_lr_single_c.append(
                         train_lr_imgs[train_rand_idx[idx + i]][:, :, 0].reshape(config.TRAIN.img_H,
                                                                                 config.TRAIN.img_W, 1))
+                    b_imgs_resi.append(
+                        abs(train_lr_imgs[train_rand_idx[idx + i]][:,:,0] \
+                            - train_hr_imgs[train_rand_idx[idx + i]][:,:,0]).reshape(config.TRAIN.img_H,
+                                                                                config.TRAIN.img_W, 1))
 
+            # 00
             if epoch == 0:
                 forward_results = []
                 err = []
@@ -780,23 +784,31 @@ def train_multiple():
                 # print my_labels
                 continue
 
+            step_time = time.time()
+
             my_labels = train_labels[idx:idx + batch_size]
             # print 'labels: ', my_labels
 
-            # step_time = time.time()
+            # 01
+
             # input_psnr = cal_PSNR(np.asarray(b_imgs_lr_single_c), np.asarray(b_imgs_hr))
             # my_labels = np.zeros_like(input_psnr, dtype=np.int32)
             # my_labels[input_psnr > 37] = 1
             # my_labels = my_labels.reshape((batch_size,))
             # print my_labels
 
-            err_softmax, _, summary, probs = sess_2.run([softmax_loss, softmax_opt, merged_2, endpoints['predictions']],
-                                                        {t_image_2: b_imgs_lr_single_c, t_labels: my_labels})
-            print("Epoch [%2d/%2d] %4d time: %4.4fs, softmax: %.8f " % (
-                epoch, n_epoch_init, n_iter, time.time() - step_time, err_softmax))
-            train_writer_2.add_summary(summary, total_iter)
+            # 10
+            # my_labels = np.asarray([labels_by_rmac[train_rand_idx[idx+i]] for i in range(batch_size)], dtype=np.int32)
+            # my_labels = my_labels.reshape((batch_size,))
+            if not epoch > config.TRAIN.first_stage_stop:
+                err_softmax, _, summary, probs = sess_2.run([softmax_loss, softmax_opt, merged_2, endpoints['predictions']],
+                                                        {t_image_2: b_imgs_resi, t_labels: my_labels})
+                print("Epoch [%2d/%2d] %4d time: %4.4fs, softmax: %.8f " % (
+                    epoch, n_epoch_init, n_iter, time.time() - step_time, err_softmax))
+                train_writer_2.add_summary(summary, total_iter)
+            else:
 
-            # probs = sess_2.run(endpoints['predictions'],{t_image_2: b_imgs_lr_single_c})
+                probs = sess_2.run(endpoints['predictions'],{t_image_2: b_imgs_resi})
 
             flags = probs.argmax(axis=1)
             # flags = probs > 1.0/3

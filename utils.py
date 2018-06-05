@@ -1,12 +1,27 @@
 import tensorflow as tf
 import tensorlayer as tl
 from tensorlayer.prepro import *
+import cv2
 # from config import config, log_config
 #
 # img_path = config.TRAIN.img_path
 
 import scipy
 import numpy as np
+
+def get_sub_rgb_imgs_fn(file_name, path, sub_img_w, sub_img_h, stride_w, stride_h, row_index=0, col_index=1):
+    x = cv2.imread(path + file_name)
+    h, w = x.shape[row_index], x.shape[col_index]
+    results = list()
+    for l_w in range(0, w - w%sub_img_w, stride_w):
+        for l_h in range(0, h - h%sub_img_h, stride_h):
+            if l_h + sub_img_h > h:
+                l_h = h - sub_img_h
+            if l_w + sub_img_w > w:
+                l_w = w - sub_img_w
+            sub_img = x[l_h:l_h + sub_img_h, l_w:l_w + sub_img_w]
+            results.append(sub_img)
+    return np.asarray(results)
 
 def get_imgs_fn(file_name, path):
     """ Input an image path and name, return an image array """
